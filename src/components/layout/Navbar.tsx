@@ -10,6 +10,7 @@ import {
   Network,
   BookOpen,
   Binary,
+  Table,
 } from 'lucide-react';
 
 export type ActiveTab =
@@ -18,6 +19,7 @@ export type ActiveTab =
   | 'benchmark'
   | 'datastructures'
   | 'challenge'
+  | 'dp'
   | 'pathfinding'
   | 'scheduling'
   | 'graph'
@@ -35,6 +37,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange }) => {
     { id: 'benchmark', label: 'Benchmark', icon: BarChart3 },
     { id: 'datastructures', label: 'Data Structures', icon: Database },
     { id: 'challenge', label: 'Challenge', icon: Award },
+    { id: 'dp', label: 'Dynamic Programming', icon: Table },
     { id: 'pathfinding', label: 'Pathfinding', icon: Compass },
     { id: 'scheduling', label: 'Scheduler', icon: Cpu },
     { id: 'graph', label: 'Graph', icon: Network },

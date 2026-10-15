@@ -3,7 +3,7 @@
 
 **Live Repository**: https://github.com/MayurHarde02/algo-nexus  
 **License**: MIT  
-**Current Release**: v1.0.0  
+**Current Release**: v1.1.0  
 
 An interactive visual learning environment designed for Computer Engineering, Data Structures, Algorithms, and Operating Systems courses.
 
@@ -15,9 +15,10 @@ ALGO NEXUS pairs deterministic execution engines with real-time visual inspectio
 
 1. **Deterministic Step Engines**: Algorithm computation is strictly decoupled from presentation. Algorithms produce an ordered, immutable snapshot stream.
 2. **True Operation Counters**: The application tracks concrete comparisons, swaps, memory writes, queue transitions, and timeline schedules rather than relying on variable browser clock timers.
-3. **Bidirectional Scrubbing & Instant Finish**: Full support for Play, Pause, Step Forward, Step Backward, Instant Finish (`[F]`), Reset (`[R]`), and Variable Time-Interval controls.
-4. **Keyboard Shortcuts**: Hotkeys for rapid interaction (`Space` for play/pause, `←`/`→` for stepping, `R` for reset, `F` for finish, `1-5` for speed presets).
-5. **Engineering Aesthetic**: Built with high-contrast, technical UI standards without gradients, pill buttons, marketing counters, or artificial fluff.
+3. **Hardware Cache Locality Simulation**: Models direct-mapped and 2-way set-associative L1 data caches to demonstrate physical memory hierarchy hits and misses.
+4. **Bidirectional Scrubbing & Instant Finish**: Full support for Play, Pause, Step Forward, Step Backward, Instant Finish (`[F]`), Reset (`[R]`), and Variable Time-Interval controls.
+5. **Keyboard Shortcuts**: Hotkeys for rapid interaction (`Space` for play/pause, `←`/`→` for stepping, `R` for reset, `F` for finish, `1-5` for speed presets).
+6. **Engineering Aesthetic**: Built with high-contrast, technical UI standards without gradients, pill buttons, marketing counters, or artificial fluff.
 
 ---
 
@@ -27,6 +28,7 @@ ALGO NEXUS pairs deterministic execution engines with real-time visual inspectio
 - **Supported Algorithms**: Bubble Sort, Insertion Sort, Selection Sort, Merge Sort, Quick Sort (Lomuto Partition), Heap Sort.
 - **Variable Inspector**: Live inspection of active register variables (`i`, `j`, `key`, `pivot`, `minIndex`, `heapSize`) with changed values highlighted.
 - **Decision Logic**: Plain-English explanations explaining exactly why each swap, shift, or partition occurred.
+- **L1 Hardware Cache Monitor**: Real-time simulation of direct-mapped and 2-way set-associative L1 cache lines, tracking hits, misses, and spatial locality.
 - **Pseudocode Panel**: Real-time line-by-line execution tracking with collapsible view and documented loop invariants.
 
 ### 2. Algorithm Race
@@ -42,8 +44,14 @@ ALGO NEXUS pairs deterministic execution engines with real-time visual inspectio
 - **Stack (LIFO)**: Push, Pop, Peek, Clear with dynamic `TOP` pointer indicator.
 - **Queue (FIFO)**: Enqueue, Dequeue, Peek, Clear with `FRONT` and `REAR` pointer indicators.
 - **Binary Search Tree (BST)**: Insert, Search with animated path highlighting, and In-Order sorted extraction.
+- **Self-Balancing AVL Tree**: Rotations ($LL, RR, LR, RL$) with live node balance factor indicators ($BF = h_L - h_R$).
+- **Binary Min-Heap**: Complete binary tree representation with in-place array buffer $[0..n-1]$ duality.
 
-### 5. Challenge Mode
+### 5. Dynamic Programming Workbench
+- **0/1 Knapsack Problem**: 2D bottom-up memoization tableau with live cell dependencies ($DP[i-1][w]$ and $DP[i-1][w-w_i]$) and optimal subset backtracking.
+- **Longest Common Subsequence (LCS)**: 2D string match matrix with match detection and recovered sequence backtracking.
+
+### 6. Challenge Mode
 - **Comprehension Assessment**: Interactive questions derived from concrete algorithmic invariants and worst-case bounds.
 - **Instant Verification**: Feedback explaining why an answer is correct or incorrect based on data structure properties.
 
@@ -113,5 +121,5 @@ npm run preview
 - **Bundler**: Vite 8
 - **Styling**: Tailwind CSS
 - **Iconography**: Lucide Icons
-- **Testing**: Vitest (49 unit tests)
+- **Testing**: Vitest (53 unit tests)
 - **License**: MIT

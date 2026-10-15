@@ -8,6 +8,8 @@ import { usePlayback } from '../../hooks/usePlayback';
 import { ControlBar } from '../../components/common/ControlBar';
 import { PseudocodePanel } from '../../components/pseudocode/PseudocodePanel';
 import { VariableInspector } from '../../components/inspector/VariableInspector';
+import { CacheVisualizer } from '../../components/cache/CacheVisualizer';
+import { computeCacheReplay } from '../../lib/cacheSimulation';
 import { SavedExperimentsModal } from '../../components/experiments/SavedExperimentsModal';
 import { saveExperiment, type SavedExperiment } from '../../lib/experiments';
 import {
@@ -21,6 +23,7 @@ import {
   BookmarkPlus,
   PanelRightClose,
   PanelRightOpen,
+  Cpu,
 } from 'lucide-react';
 
 function generateRandomArray(size: number, min = 5, max = 100): number[] {
@@ -52,6 +55,7 @@ export const SortingVisualizer: React.FC = () => {
   const [showCustomModal, setShowCustomModal] = useState<boolean>(false);
   const [showSavedModal, setShowSavedModal] = useState<boolean>(false);
   const [showCodePanel, setShowCodePanel] = useState<boolean>(true);
+  const [showCacheMonitor, setShowCacheMonitor] = useState<boolean>(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
 
   // Generate snapshots deterministically
@@ -74,6 +78,11 @@ export const SortingVisualizer: React.FC = () => {
 
   const currentSnapshot = snapshots[playback.currentIndex] || snapshots[0];
   const metadata = SORTING_METADATA[selectedAlgo];
+
+  const cacheData = useMemo(() => {
+    if (!showCacheMonitor) return null;
+    return computeCacheReplay(snapshots, playback.currentIndex);
+  }, [snapshots, playback.currentIndex, showCacheMonitor]);
 
   // Handlers for input presets
   const handleGenerateRandom = useCallback(() => {
@@ -284,6 +293,20 @@ export const SortingVisualizer: React.FC = () => {
             )}
             <span>{showCodePanel ? 'Hide Code' : 'Show Code'}</span>
           </button>
+
+          {/* L1 Cache Monitor Toggle */}
+          <button
+            onClick={() => setShowCacheMonitor(!showCacheMonitor)}
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-sm text-xs font-mono border transition-colors ${
+              showCacheMonitor
+                ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 font-bold'
+                : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+            title="Toggle L1 Data Cache Simulation"
+          >
+            <Cpu className="w-3.5 h-3.5 text-emerald-400" />
+            <span>L1 Cache</span>
+          </button>
         </div>
       </div>
 
@@ -398,6 +421,19 @@ export const SortingVisualizer: React.FC = () => {
             stepIndex={playback.currentIndex}
             totalSteps={snapshots.length}
           />
+
+          {/* L1 Hardware Cache Visualizer */}
+          {showCacheMonitor && cacheData && (
+            <CacheVisualizer
+              lines={cacheData.lines}
+              hits={cacheData.hits}
+              misses={cacheData.misses}
+              hitRate={cacheData.hitRate}
+              missRate={cacheData.missRate}
+              associativity="direct"
+              lastAccess={cacheData.lastAccess}
+            />
+          )}
 
           {/* Playback Controls */}
           <ControlBar
