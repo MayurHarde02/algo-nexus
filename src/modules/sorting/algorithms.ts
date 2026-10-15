@@ -185,7 +185,10 @@ function createSnapshot(
   comparisons: number,
   swaps: number,
   description: string,
-  pseudocodeLine: number
+  pseudocodeLine: number,
+  variables?: Record<string, string | number | boolean>,
+  changedKeys?: string[],
+  reasoning?: string
 ): SortingSnapshot {
   return {
     array: arr.map((val, idx) => ({
@@ -197,6 +200,9 @@ function createSnapshot(
     swaps,
     description,
     pseudocodeLine,
+    variables,
+    changedKeys,
+    reasoning,
   };
 }
 
@@ -210,7 +216,17 @@ export function generateBubbleSortSnapshots(initialArr: number[]): SortingSnapsh
   const states: Record<number, ElementState> = {};
 
   snapshots.push(
-    createSnapshot(a, { ...states }, comparisons, swaps, 'Initial array state before sorting.', 0)
+    createSnapshot(
+      a,
+      { ...states },
+      comparisons,
+      swaps,
+      'Initial array state before sorting.',
+      0,
+      { n, pass: 0, swapped: false },
+      ['n'],
+      'Array is unsorted. Beginning iterative adjacent comparison passes.'
+    )
   );
 
   let swapped = false;
@@ -219,6 +235,8 @@ export function generateBubbleSortSnapshots(initialArr: number[]): SortingSnapsh
     for (let j = 0; j < n - i - 1; j++) {
       comparisons++;
       const compStates: Record<number, ElementState> = { ...states, [j]: 'comparing', [j + 1]: 'comparing' };
+      const requiresSwap = a[j] > a[j + 1];
+
       snapshots.push(
         createSnapshot(
           a,
@@ -226,11 +244,16 @@ export function generateBubbleSortSnapshots(initialArr: number[]): SortingSnapsh
           comparisons,
           swaps,
           `Comparing A[${j}] (${a[j]}) and A[${j + 1}] (${a[j + 1]}).`,
-          5
+          5,
+          { i, j, 'A[j]': a[j], 'A[j+1]': a[j + 1], swapped },
+          ['j', 'A[j]', 'A[j+1]'],
+          requiresSwap
+            ? `Condition A[${j}] (${a[j]}) > A[${j + 1}] (${a[j + 1]}) is TRUE: Elements are inverted and must be swapped.`
+            : `Condition A[${j}] (${a[j]}) > A[${j + 1}] (${a[j + 1]}) is FALSE: Invariant holds, no swap necessary.`
         )
       );
 
-      if (a[j] > a[j + 1]) {
+      if (requiresSwap) {
         swaps++;
         const temp = a[j];
         a[j] = a[j + 1];
@@ -245,7 +268,10 @@ export function generateBubbleSortSnapshots(initialArr: number[]): SortingSnapsh
             comparisons,
             swaps,
             `Inversion detected: swapped ${a[j + 1]} with ${a[j]}.`,
-            6
+            6,
+            { i, j, 'A[j]': a[j], 'A[j+1]': a[j + 1], swapped: true },
+            ['swapped', 'A[j]', 'A[j+1]'],
+            `Performed exchange. Value ${a[j]} moved to index ${j}, and larger value ${a[j + 1]} bubbled rightward to index ${j + 1}.`
           )
         );
       }
@@ -258,7 +284,10 @@ export function generateBubbleSortSnapshots(initialArr: number[]): SortingSnapsh
         comparisons,
         swaps,
         `Pass ${i + 1} completed. Element at index ${n - i - 1} (${a[n - i - 1]}) is in final sorted position.`,
-        10
+        10,
+        { pass: i + 1, sortedIndex: n - i - 1, sortedValue: a[n - i - 1], swapped },
+        ['pass', 'sortedIndex'],
+        `Largest remaining item has reached index ${n - i - 1}. Suffix A[${n - i - 1}..${n - 1}] is finalized.`
       )
     );
 
@@ -270,7 +299,10 @@ export function generateBubbleSortSnapshots(initialArr: number[]): SortingSnapsh
           comparisons,
           swaps,
           'Early termination condition met: zero swaps performed during full pass. Array is fully sorted.',
-          11
+          11,
+          { swapped: false, earlyExit: true },
+          ['earlyExit'],
+          'Early exit triggered: Since no adjacent pair was out of order, the array is strictly monotonic. Remaining passes skipped in O(n).'
         )
       );
       break;
@@ -279,7 +311,17 @@ export function generateBubbleSortSnapshots(initialArr: number[]): SortingSnapsh
 
   for (let k = 0; k < n; k++) states[k] = 'sorted';
   snapshots.push(
-    createSnapshot(a, { ...states }, comparisons, swaps, 'Bubble sort complete. Array is strictly sorted.', 12)
+    createSnapshot(
+      a,
+      { ...states },
+      comparisons,
+      swaps,
+      'Bubble sort complete. Array is strictly sorted.',
+      12,
+      { status: 'complete', comparisons, swaps },
+      ['status'],
+      'Execution terminated. Invariant satisfied across all indices.'
+    )
   );
 
   return snapshots;
@@ -290,12 +332,22 @@ export function generateInsertionSortSnapshots(initialArr: number[]): SortingSna
   const snapshots: SortingSnapshot[] = [];
   const a = [...initialArr];
   let comparisons = 0;
-  let swaps = 0; // corresponds to shift writes in insertion sort
+  let swaps = 0;
   const n = a.length;
   const states: Record<number, ElementState> = { 0: 'sorted' };
 
   snapshots.push(
-    createSnapshot(a, { ...states }, comparisons, swaps, 'Initial array state. Single element prefix A[0] is trivially sorted.', 1)
+    createSnapshot(
+      a,
+      { ...states },
+      comparisons,
+      swaps,
+      'Initial array state. Single element prefix A[0] is trivially sorted.',
+      1,
+      { sortedPrefixLength: 1, key: a[0] },
+      ['sortedPrefixLength'],
+      'Base case: Subarray of length 1 is already sorted by definition.'
+    )
   );
 
   for (let i = 1; i < n; i++) {
@@ -304,22 +356,56 @@ export function generateInsertionSortSnapshots(initialArr: number[]): SortingSna
 
     states[i] = 'pivot';
     snapshots.push(
-      createSnapshot(a, { ...states }, comparisons, swaps, `Inspecting key A[${i}] = ${key}. Searching insertion position in sorted prefix.`, 2)
+      createSnapshot(
+        a,
+        { ...states },
+        comparisons,
+        swaps,
+        `Inspecting key A[${i}] = ${key}. Searching insertion position in sorted prefix.`,
+        2,
+        { i, key, j },
+        ['i', 'key', 'j'],
+        `Extracted key ${key} from position ${i}. Comparing backward against sorted prefix A[0..${i - 1}].`
+      )
     );
 
     while (j >= 0) {
       comparisons++;
       const compStates = { ...states, [j]: 'comparing' as ElementState, [j + 1]: 'pivot' as ElementState };
+      const greater = a[j] > key;
+
       snapshots.push(
-        createSnapshot(a, compStates, comparisons, swaps, `Comparing sorted element A[${j}] (${a[j]}) with key (${key}).`, 4)
+        createSnapshot(
+          a,
+          compStates,
+          comparisons,
+          swaps,
+          `Comparing sorted element A[${j}] (${a[j]}) with key (${key}).`,
+          4,
+          { i, j, 'A[j]': a[j], key },
+          ['j', 'A[j]'],
+          greater
+            ? `Because sorted item ${a[j]} > key ${key}, it must shift rightward to position ${j + 1}.`
+            : `Because ${a[j]} <= key ${key}, the correct insertion slot has been located at index ${j + 1}.`
+        )
       );
 
-      if (a[j] > key) {
+      if (greater) {
         swaps++;
         a[j + 1] = a[j];
         const shiftStates = { ...states, [j + 1]: 'swapping' as ElementState };
         snapshots.push(
-          createSnapshot(a, shiftStates, comparisons, swaps, `A[${j}] (${a[j]}) > key (${key}). Shifting A[${j}] right to position ${j + 1}.`, 5)
+          createSnapshot(
+            a,
+            shiftStates,
+            comparisons,
+            swaps,
+            `A[${j}] (${a[j]}) > key (${key}). Shifting A[${j}] right to position ${j + 1}.`,
+            5,
+            { j, shiftedValue: a[j], targetSlot: j + 1 },
+            ['shiftedValue', 'targetSlot'],
+            `Shifted ${a[j]} one position to the right, freeing up candidate slot ${j}.`
+          )
         );
         j--;
       } else {
@@ -331,13 +417,33 @@ export function generateInsertionSortSnapshots(initialArr: number[]): SortingSna
     a[j + 1] = key;
     for (let k = 0; k <= i; k++) states[k] = 'sorted';
     snapshots.push(
-      createSnapshot(a, { ...states }, comparisons, swaps, `Inserted key ${key} at index ${j + 1}. Sorted prefix now spans indices 0 through ${i}.`, 8)
+      createSnapshot(
+        a,
+        { ...states },
+        comparisons,
+        swaps,
+        `Inserted key ${key} at index ${j + 1}. Sorted prefix now spans indices 0 through ${i}.`,
+        8,
+        { insertedIndex: j + 1, key, prefixEnd: i },
+        ['insertedIndex', 'prefixEnd'],
+        `Placed key ${key} into finalized position ${j + 1}. Subarray A[0..${i}] is now sorted.`
+      )
     );
   }
 
   for (let k = 0; k < n; k++) states[k] = 'sorted';
   snapshots.push(
-    createSnapshot(a, { ...states }, comparisons, swaps, 'Insertion sort complete. All elements ordered.', 10)
+    createSnapshot(
+      a,
+      { ...states },
+      comparisons,
+      swaps,
+      'Insertion sort complete. All elements ordered.',
+      10,
+      { status: 'complete', comparisons, swaps },
+      ['status'],
+      'Array is strictly sorted.'
+    )
   );
 
   return snapshots;
@@ -353,29 +459,73 @@ export function generateSelectionSortSnapshots(initialArr: number[]): SortingSna
   const states: Record<number, ElementState> = {};
 
   snapshots.push(
-    createSnapshot(a, { ...states }, comparisons, swaps, 'Initial state before selection passes.', 0)
+    createSnapshot(
+      a,
+      { ...states },
+      comparisons,
+      swaps,
+      'Initial state before selection passes.',
+      0,
+      { n, pass: 0 },
+      ['n'],
+      'Will iteratively find minimum unsorted value and place at prefix index i.'
+    )
   );
 
   for (let i = 0; i < n - 1; i++) {
     let minIndex = i;
     states[minIndex] = 'pivot';
     snapshots.push(
-      createSnapshot(a, { ...states }, comparisons, swaps, `Pass ${i + 1}: Initialized current minimum candidate at index ${i} (${a[i]}).`, 3)
+      createSnapshot(
+        a,
+        { ...states },
+        comparisons,
+        swaps,
+        `Pass ${i + 1}: Initialized current minimum candidate at index ${i} (${a[i]}).`,
+        3,
+        { i, minIndex, minVal: a[i] },
+        ['i', 'minIndex', 'minVal'],
+        `Assumed A[${i}] (${a[i]}) as baseline minimum for current pass.`
+      )
     );
 
     for (let j = i + 1; j < n; j++) {
       comparisons++;
       const compStates = { ...states, [j]: 'comparing' as ElementState, [minIndex]: 'pivot' as ElementState };
+      const isSmaller = a[j] < a[minIndex];
+
       snapshots.push(
-        createSnapshot(a, compStates, comparisons, swaps, `Comparing A[${j}] (${a[j]}) with current minimum A[${minIndex}] (${a[minIndex]}).`, 5)
+        createSnapshot(
+          a,
+          compStates,
+          comparisons,
+          swaps,
+          `Comparing A[${j}] (${a[j]}) with current minimum A[${minIndex}] (${a[minIndex]}).`,
+          5,
+          { j, 'A[j]': a[j], minIndex, 'A[minIndex]': a[minIndex] },
+          ['j', 'A[j]'],
+          isSmaller
+            ? `Found smaller value ${a[j]} < ${a[minIndex]}. Updating minIndex to ${j}.`
+            : `Value ${a[j]} >= current minimum ${a[minIndex]}. Min candidate retained.`
+        )
       );
 
-      if (a[j] < a[minIndex]) {
+      if (isSmaller) {
         delete states[minIndex];
         minIndex = j;
         states[minIndex] = 'pivot';
         snapshots.push(
-          createSnapshot(a, { ...states }, comparisons, swaps, `New minimum found: value ${a[minIndex]} at index ${minIndex}.`, 6)
+          createSnapshot(
+            a,
+            { ...states },
+            comparisons,
+            swaps,
+            `New minimum found: value ${a[minIndex]} at index ${minIndex}.`,
+            6,
+            { minIndex, newMin: a[minIndex] },
+            ['minIndex', 'newMin'],
+            `Updated minimum candidate to ${a[minIndex]} at index ${minIndex}.`
+          )
         );
       }
     }
@@ -387,20 +537,50 @@ export function generateSelectionSortSnapshots(initialArr: number[]): SortingSna
       a[minIndex] = temp;
       const swapStates = { ...states, [i]: 'swapping' as ElementState, [minIndex]: 'swapping' as ElementState };
       snapshots.push(
-        createSnapshot(a, swapStates, comparisons, swaps, `Swapping minimum element ${a[i]} into index ${i}.`, 10)
+        createSnapshot(
+          a,
+          swapStates,
+          comparisons,
+          swaps,
+          `Swapping minimum element ${a[i]} into index ${i}.`,
+          10,
+          { targetSlot: i, placedVal: a[i], oldIndex: minIndex },
+          ['targetSlot', 'placedVal'],
+          `Exchanged minimum value ${a[i]} with previous element ${a[minIndex]}.`
+        )
       );
     }
 
     delete states[minIndex];
     states[i] = 'sorted';
     snapshots.push(
-      createSnapshot(a, { ...states }, comparisons, swaps, `Position ${i} finalized with value ${a[i]}.`, 12)
+      createSnapshot(
+        a,
+        { ...states },
+        comparisons,
+        swaps,
+        `Position ${i} finalized with value ${a[i]}.`,
+        12,
+        { sortedIndex: i, value: a[i] },
+        ['sortedIndex'],
+        `Prefix A[0..${i}] now contains the smallest ${i + 1} elements in order.`
+      )
     );
   }
 
   for (let k = 0; k < n; k++) states[k] = 'sorted';
   snapshots.push(
-    createSnapshot(a, { ...states }, comparisons, swaps, 'Selection sort complete. Array fully sorted.', 13)
+    createSnapshot(
+      a,
+      { ...states },
+      comparisons,
+      swaps,
+      'Selection sort complete. Array fully sorted.',
+      13,
+      { status: 'complete', comparisons, swaps },
+      ['status'],
+      'Selection complete.'
+    )
   );
 
   return snapshots;
@@ -411,11 +591,21 @@ export function generateMergeSortSnapshots(initialArr: number[]): SortingSnapsho
   const snapshots: SortingSnapshot[] = [];
   const a = [...initialArr];
   let comparisons = 0;
-  let swaps = 0; // memory writes
+  let swaps = 0;
   const states: Record<number, ElementState> = {};
 
   snapshots.push(
-    createSnapshot(a, { ...states }, comparisons, swaps, 'Initial array. Beginning recursive divide phase.', 0)
+    createSnapshot(
+      a,
+      { ...states },
+      comparisons,
+      swaps,
+      'Initial array. Beginning recursive divide phase.',
+      0,
+      { n: a.length },
+      ['n'],
+      'Divide phase will partition array recursively down to base cases of length 1.'
+    )
   );
 
   function merge(left: number, mid: number, right: number) {
@@ -432,7 +622,10 @@ export function generateMergeSortSnapshots(initialArr: number[]): SortingSnapsho
         comparisons,
         swaps,
         `Merging sub-arrays A[${left}..${mid}] and A[${mid + 1}..${right}].`,
-        8
+        8,
+        { left, mid, right, leftSize: leftArr.length, rightSize: rightArr.length },
+        ['left', 'mid', 'right'],
+        `Two sorted segments A[${left}..${mid}] and A[${mid + 1}..${right}] ready for 2-pointer linear merge.`
       )
     );
 
@@ -443,6 +636,8 @@ export function generateMergeSortSnapshots(initialArr: number[]): SortingSnapsho
     while (i < leftArr.length && j < rightArr.length) {
       comparisons++;
       states[k] = 'comparing';
+      const chooseLeft = leftArr[i] <= rightArr[j];
+
       snapshots.push(
         createSnapshot(
           a,
@@ -450,16 +645,31 @@ export function generateMergeSortSnapshots(initialArr: number[]): SortingSnapsho
           comparisons,
           swaps,
           `Comparing left item (${leftArr[i]}) and right item (${rightArr[j]}).`,
-          9
+          9,
+          { 'leftArr[i]': leftArr[i], 'rightArr[j]': rightArr[j], writeSlot: k },
+          ['leftArr[i]', 'rightArr[j]', 'writeSlot'],
+          chooseLeft
+            ? `leftArr[${i}] (${leftArr[i]}) <= rightArr[${j}] (${rightArr[j]}): Selecting left item to maintain stability.`
+            : `rightArr[${j}] (${rightArr[j]}) < leftArr[${i}] (${leftArr[i]}): Selecting smaller right item.`
         )
       );
 
-      if (leftArr[i] <= rightArr[j]) {
+      if (chooseLeft) {
         swaps++;
         a[k] = leftArr[i];
         states[k] = 'swapping';
         snapshots.push(
-          createSnapshot(a, { ...states }, comparisons, swaps, `Writing ${leftArr[i]} into index ${k}.`, 9)
+          createSnapshot(
+            a,
+            { ...states },
+            comparisons,
+            swaps,
+            `Writing ${leftArr[i]} into index ${k}.`,
+            9,
+            { writtenVal: leftArr[i], targetIndex: k },
+            ['writtenVal', 'targetIndex'],
+            `Wrote ${leftArr[i]} into sorted position ${k}. Incremented left pointer.`
+          )
         );
         i++;
       } else {
@@ -467,7 +677,17 @@ export function generateMergeSortSnapshots(initialArr: number[]): SortingSnapsho
         a[k] = rightArr[j];
         states[k] = 'swapping';
         snapshots.push(
-          createSnapshot(a, { ...states }, comparisons, swaps, `Writing ${rightArr[j]} into index ${k}.`, 9)
+          createSnapshot(
+            a,
+            { ...states },
+            comparisons,
+            swaps,
+            `Writing ${rightArr[j]} into index ${k}.`,
+            9,
+            { writtenVal: rightArr[j], targetIndex: k },
+            ['writtenVal', 'targetIndex'],
+            `Wrote ${rightArr[j]} into sorted position ${k}. Incremented right pointer.`
+          )
         );
         j++;
       }
@@ -479,7 +699,17 @@ export function generateMergeSortSnapshots(initialArr: number[]): SortingSnapsho
       a[k] = leftArr[i];
       states[k] = 'swapping';
       snapshots.push(
-        createSnapshot(a, { ...states }, comparisons, swaps, `Copying remaining left item ${leftArr[i]} to index ${k}.`, 9)
+        createSnapshot(
+          a,
+          { ...states },
+          comparisons,
+          swaps,
+          `Copying remaining left item ${leftArr[i]} to index ${k}.`,
+          9,
+          { leftoverVal: leftArr[i], targetIndex: k },
+          ['leftoverVal', 'targetIndex'],
+          'Drained residual elements from left partition.'
+        )
       );
       i++;
       k++;
@@ -490,7 +720,17 @@ export function generateMergeSortSnapshots(initialArr: number[]): SortingSnapsho
       a[k] = rightArr[j];
       states[k] = 'swapping';
       snapshots.push(
-        createSnapshot(a, { ...states }, comparisons, swaps, `Copying remaining right item ${rightArr[j]} to index ${k}.`, 9)
+        createSnapshot(
+          a,
+          { ...states },
+          comparisons,
+          swaps,
+          `Copying remaining right item ${rightArr[j]} to index ${k}.`,
+          9,
+          { leftoverVal: rightArr[j], targetIndex: k },
+          ['leftoverVal', 'targetIndex'],
+          'Drained residual elements from right partition.'
+        )
       );
       j++;
       k++;
@@ -513,7 +753,17 @@ export function generateMergeSortSnapshots(initialArr: number[]): SortingSnapsho
 
   for (let k = 0; k < a.length; k++) states[k] = 'sorted';
   snapshots.push(
-    createSnapshot(a, { ...states }, comparisons, swaps, 'Merge sort complete. All merges completed in O(n log n).', 10)
+    createSnapshot(
+      a,
+      { ...states },
+      comparisons,
+      swaps,
+      'Merge sort complete. All merges completed in O(n log n).',
+      10,
+      { status: 'complete', comparisons, writes: swaps },
+      ['status'],
+      'All divide-and-conquer subproblems resolved.'
+    )
   );
 
   return snapshots;
@@ -528,25 +778,59 @@ export function generateQuickSortSnapshots(initialArr: number[]): SortingSnapsho
   const states: Record<number, ElementState> = {};
 
   snapshots.push(
-    createSnapshot(a, { ...states }, comparisons, swaps, 'Initial array. Beginning recursive Lomuto quicksort.', 0)
+    createSnapshot(
+      a,
+      { ...states },
+      comparisons,
+      swaps,
+      'Initial array. Beginning recursive Lomuto quicksort.',
+      0,
+      { n: a.length },
+      ['n'],
+      'Will choose pivot A[high] and partition array into elements <= pivot and > pivot.'
+    )
   );
 
   function partition(low: number, high: number): number {
     const pivot = a[high];
     states[high] = 'pivot';
     snapshots.push(
-      createSnapshot(a, { ...states }, comparisons, swaps, `Selected pivot A[${high}] = ${pivot}. Partitioning range [${low}..${high}].`, 7)
+      createSnapshot(
+        a,
+        { ...states },
+        comparisons,
+        swaps,
+        `Selected pivot A[${high}] = ${pivot}. Partitioning range [${low}..${high}].`,
+        7,
+        { low, high, pivot, i: low - 1 },
+        ['pivot', 'i'],
+        `Pivot element fixed at ${pivot}. Pointer i initialized to low - 1 (${low - 1}).`
+      )
     );
 
     let i = low - 1;
     for (let j = low; j < high; j++) {
       comparisons++;
       states[j] = 'comparing';
+      const smallerOrEqual = a[j] <= pivot;
+
       snapshots.push(
-        createSnapshot(a, { ...states }, comparisons, swaps, `Comparing A[${j}] (${a[j]}) against pivot (${pivot}).`, 8)
+        createSnapshot(
+          a,
+          { ...states },
+          comparisons,
+          swaps,
+          `Comparing A[${j}] (${a[j]}) against pivot (${pivot}).`,
+          8,
+          { j, 'A[j]': a[j], pivot, i },
+          ['j', 'A[j]'],
+          smallerOrEqual
+            ? `A[${j}] (${a[j]}) <= pivot (${pivot}): Expanding smaller-element region by incrementing i and swapping A[i] with A[j].`
+            : `A[${j}] (${a[j]}) > pivot (${pivot}): Belongs in right partition; no swap needed.`
+        )
       );
 
-      if (a[j] <= pivot) {
+      if (smallerOrEqual) {
         i++;
         swaps++;
         const temp = a[i];
@@ -554,7 +838,17 @@ export function generateQuickSortSnapshots(initialArr: number[]): SortingSnapsho
         a[j] = temp;
         const swapStates = { ...states, [i]: 'swapping' as ElementState, [j]: 'swapping' as ElementState };
         snapshots.push(
-          createSnapshot(a, swapStates, comparisons, swaps, `A[${j}] <= pivot: swapped A[${i}] and A[${j}].`, 8)
+          createSnapshot(
+            a,
+            swapStates,
+            comparisons,
+            swaps,
+            `A[${j}] <= pivot: swapped A[${i}] and A[${j}].`,
+            8,
+            { i, j, 'A[i]': a[i], 'A[j]': a[j] },
+            ['i', 'A[i]', 'A[j]'],
+            `Moved smaller element ${a[i]} into left partition slot ${i}.`
+          )
         );
       }
       states[j] = 'auxiliary';
@@ -573,7 +867,10 @@ export function generateQuickSortSnapshots(initialArr: number[]): SortingSnapsho
         comparisons,
         swaps,
         `Placed pivot ${pivot} into its finalized split index ${i + 1}.`,
-        9
+        9,
+        { pivotIndex: i + 1, pivotVal: pivot },
+        ['pivotIndex'],
+        `Pivot ${pivot} is now at its final sorted rank ${i + 1}. Left partition contains values <= ${pivot}, right > ${pivot}.`
       )
     );
 
@@ -600,7 +897,17 @@ export function generateQuickSortSnapshots(initialArr: number[]): SortingSnapsho
 
   for (let k = 0; k < a.length; k++) states[k] = 'sorted';
   snapshots.push(
-    createSnapshot(a, { ...states }, comparisons, swaps, 'Quick sort complete. Array fully partitioned and sorted.', 5)
+    createSnapshot(
+      a,
+      { ...states },
+      comparisons,
+      swaps,
+      'Quick sort complete. Array fully partitioned and sorted.',
+      5,
+      { status: 'complete', comparisons, swaps },
+      ['status'],
+      'Recursive quicksort complete.'
+    )
   );
 
   return snapshots;
@@ -616,7 +923,17 @@ export function generateHeapSortSnapshots(initialArr: number[]): SortingSnapshot
   const states: Record<number, ElementState> = {};
 
   snapshots.push(
-    createSnapshot(a, { ...states }, comparisons, swaps, 'Initial array. Phase 1: Building max heap in O(n).', 0)
+    createSnapshot(
+      a,
+      { ...states },
+      comparisons,
+      swaps,
+      'Initial array. Phase 1: Building max heap in O(n).',
+      0,
+      { n, heapSize: n },
+      ['heapSize'],
+      'Will organize elements such that every parent A[i] >= its children A[2i+1] and A[2i+2].'
+    )
   );
 
   function maxHeapify(heapSize: number, root: number) {
@@ -652,7 +969,10 @@ export function generateHeapSortSnapshots(initialArr: number[]): SortingSnapshot
           comparisons,
           swaps,
           `Max-heap violation: swapped parent index ${root} (${a[largest]}) with larger child index ${largest} (${a[root]}).`,
-          10
+          10,
+          { parent: root, child: largest, newParentVal: a[root] },
+          ['parent', 'child', 'newParentVal'],
+          `Child node ${a[root]} was larger than parent ${a[largest]}. Swapped to restore max-heap invariant.`
         )
       );
 
@@ -664,14 +984,34 @@ export function generateHeapSortSnapshots(initialArr: number[]): SortingSnapshot
   for (let i = Math.floor(n / 2) - 1; i >= 0; i--) {
     states[i] = 'pivot';
     snapshots.push(
-      createSnapshot(a, { ...states }, comparisons, swaps, `Heapifying subtree rooted at index ${i}.`, 1)
+      createSnapshot(
+        a,
+        { ...states },
+        comparisons,
+        swaps,
+        `Heapifying subtree rooted at index ${i}.`,
+        1,
+        { subtreeRoot: i, rootVal: a[i] },
+        ['subtreeRoot'],
+        `Checking heap property downwards from internal node index ${i}.`
+      )
     );
     delete states[i];
     maxHeapify(n, i);
   }
 
   snapshots.push(
-    createSnapshot(a, { ...states }, comparisons, swaps, 'Max heap established. Root A[0] is the maximum element. Phase 2: Extraction.', 2)
+    createSnapshot(
+      a,
+      { ...states },
+      comparisons,
+      swaps,
+      'Max heap established. Root A[0] is the maximum element. Phase 2: Extraction.',
+      2,
+      { root: a[0], maxHeapReady: true },
+      ['root', 'maxHeapReady'],
+      `Max heap invariant satisfied. Root A[0] (${a[0]}) is confirmed maximum in heap.`
+    )
   );
 
   // Phase 2: Extract elements
@@ -689,7 +1029,10 @@ export function generateHeapSortSnapshots(initialArr: number[]): SortingSnapshot
         comparisons,
         swaps,
         `Extracted max element ${temp} to index ${i}. Restoring heap order for heap size ${i}.`,
-        4
+        4,
+        { extractedVal: temp, sortedSlot: i, remainingHeapSize: i },
+        ['extractedVal', 'sortedSlot', 'remainingHeapSize'],
+        `Moved max element ${temp} to finalized slot ${i}. Re-heapifying root down to size ${i}.`
       )
     );
 
@@ -698,7 +1041,17 @@ export function generateHeapSortSnapshots(initialArr: number[]): SortingSnapshot
 
   for (let k = 0; k < n; k++) states[k] = 'sorted';
   snapshots.push(
-    createSnapshot(a, { ...states }, comparisons, swaps, 'Heap sort complete. All elements extracted in ascending order.', 6)
+    createSnapshot(
+      a,
+      { ...states },
+      comparisons,
+      swaps,
+      'Heap sort complete. All elements extracted in ascending order.',
+      6,
+      { status: 'complete', comparisons, swaps },
+      ['status'],
+      'Heap sort completed in O(n log n).'
+    )
   );
 
   return snapshots;

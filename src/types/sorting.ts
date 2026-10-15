@@ -30,6 +30,9 @@ export interface SortingSnapshot {
   swaps: number;
   description: string;
   pseudocodeLine: number;
+  variables?: Record<string, string | number | boolean>;
+  changedKeys?: string[];
+  reasoning?: string;
 }
 
 export interface AlgorithmMetadata {

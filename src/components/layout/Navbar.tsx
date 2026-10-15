@@ -2,6 +2,9 @@ import React from 'react';
 import {
   Layers,
   Split,
+  BarChart3,
+  Database,
+  Award,
   Compass,
   Cpu,
   Network,
@@ -9,7 +12,16 @@ import {
   Binary,
 } from 'lucide-react';
 
-export type ActiveTab = 'sorting' | 'race' | 'pathfinding' | 'scheduling' | 'graph' | 'reference';
+export type ActiveTab =
+  | 'sorting'
+  | 'race'
+  | 'benchmark'
+  | 'datastructures'
+  | 'challenge'
+  | 'pathfinding'
+  | 'scheduling'
+  | 'graph'
+  | 'reference';
 
 interface NavbarProps {
   activeTab: ActiveTab;
@@ -18,12 +30,15 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange }) => {
   const navItems: { id: ActiveTab; label: string; icon: React.FC<{ className?: string }> }[] = [
-    { id: 'sorting', label: 'Sorting Arena', icon: Layers },
-    { id: 'race', label: 'Algorithm Race', icon: Split },
-    { id: 'pathfinding', label: 'Pathfinding Lab', icon: Compass },
-    { id: 'scheduling', label: 'CPU Scheduler', icon: Cpu },
-    { id: 'graph', label: 'Graph Explorer', icon: Network },
-    { id: 'reference', label: 'Complexity Matrix', icon: BookOpen },
+    { id: 'sorting', label: 'Sorting', icon: Layers },
+    { id: 'race', label: 'Race', icon: Split },
+    { id: 'benchmark', label: 'Benchmark', icon: BarChart3 },
+    { id: 'datastructures', label: 'Data Structures', icon: Database },
+    { id: 'challenge', label: 'Challenge', icon: Award },
+    { id: 'pathfinding', label: 'Pathfinding', icon: Compass },
+    { id: 'scheduling', label: 'Scheduler', icon: Cpu },
+    { id: 'graph', label: 'Graph', icon: Network },
+    { id: 'reference', label: 'Reference', icon: BookOpen },
   ];
 
   return (
@@ -59,21 +74,21 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange }) => {
               <button
                 key={item.id}
                 onClick={() => onTabChange(item.id)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-sm font-mono text-xs uppercase tracking-wider transition-colors border ${
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm font-mono text-xs uppercase tracking-wider transition-colors border ${
                   isActive
                     ? 'bg-slate-900 border-sky-400 text-sky-300 font-semibold'
                     : 'bg-transparent border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
                 }`}
               >
                 <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-sky-400' : 'text-slate-500'}`} />
-                <span>{item.label}</span>
+                <span className="whitespace-nowrap">{item.label}</span>
               </button>
             );
           })}
         </nav>
 
         {/* Engine Status indicator */}
-        <div className="hidden lg:flex items-center gap-2 font-mono text-[11px] text-slate-400 bg-slate-900/80 px-2.5 py-1 rounded-sm border border-slate-800">
+        <div className="hidden xl:flex items-center gap-2 font-mono text-[11px] text-slate-400 bg-slate-900/80 px-2.5 py-1 rounded-sm border border-slate-800">
           <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
           <span>DETERMINISTIC V8 ENGINE</span>
         </div>

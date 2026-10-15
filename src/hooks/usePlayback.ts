@@ -4,9 +4,15 @@ interface UsePlaybackOptions {
   totalSteps: number;
   initialSpeed?: number;
   onStepChange?: (index: number) => void;
+  enableKeyboardShortcuts?: boolean;
 }
 
-export function usePlayback({ totalSteps, initialSpeed = 200, onStepChange }: UsePlaybackOptions) {
+export function usePlayback({
+  totalSteps,
+  initialSpeed = 200,
+  onStepChange,
+  enableKeyboardShortcuts = false,
+}: UsePlaybackOptions) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(initialSpeed);
@@ -62,6 +68,15 @@ export function usePlayback({ totalSteps, initialSpeed = 200, onStepChange }: Us
     [totalSteps, pause, onStepChange]
   );
 
+  const jumpToEnd = useCallback(() => {
+    pause();
+    if (totalSteps > 0) {
+      const lastIndex = totalSteps - 1;
+      setCurrentIndex(lastIndex);
+      onStepChange?.(lastIndex);
+    }
+  }, [totalSteps, pause, onStepChange]);
+
   const play = useCallback(() => {
     if (totalSteps <= 1) return;
     if (currentIndex >= totalSteps - 1) {
@@ -102,6 +117,59 @@ export function usePlayback({ totalSteps, initialSpeed = 200, onStepChange }: Us
     return () => clearTimer();
   }, [isPlaying, speed, totalSteps, onStepChange, clearTimer]);
 
+  // Optional global keyboard listener
+  useEffect(() => {
+    if (!enableKeyboardShortcuts) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is typing in an input or textarea
+      if (
+        document.activeElement?.tagName === 'INPUT' ||
+        document.activeElement?.tagName === 'TEXTAREA' ||
+        document.activeElement?.tagName === 'SELECT'
+      ) {
+        return;
+      }
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        togglePlay();
+      } else if (e.code === 'ArrowRight') {
+        e.preventDefault();
+        stepForward();
+      } else if (e.code === 'ArrowLeft') {
+        e.preventDefault();
+        stepBackward();
+      } else if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
+        reset();
+      } else if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        jumpToEnd();
+      } else if (e.key === '1') {
+        setSpeed(500);
+      } else if (e.key === '2') {
+        setSpeed(250);
+      } else if (e.key === '3') {
+        setSpeed(120);
+      } else if (e.key === '4') {
+        setSpeed(50);
+      } else if (e.key === '5') {
+        setSpeed(15);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    enableKeyboardShortcuts,
+    togglePlay,
+    stepForward,
+    stepBackward,
+    reset,
+    jumpToEnd,
+  ]);
+
   return {
     currentIndex,
     isPlaying,
@@ -114,6 +182,7 @@ export function usePlayback({ totalSteps, initialSpeed = 200, onStepChange }: Us
     stepBackward,
     reset,
     jumpTo,
+    jumpToEnd,
     isAtStart: currentIndex === 0,
     isAtEnd: currentIndex >= totalSteps - 1,
   };

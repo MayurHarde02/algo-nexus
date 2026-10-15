@@ -7,6 +7,9 @@ import type { SortingAlgorithmKey } from '../../types/sorting';
 import { usePlayback } from '../../hooks/usePlayback';
 import { ControlBar } from '../../components/common/ControlBar';
 import { PseudocodePanel } from '../../components/pseudocode/PseudocodePanel';
+import { VariableInspector } from '../../components/inspector/VariableInspector';
+import { SavedExperimentsModal } from '../../components/experiments/SavedExperimentsModal';
+import { saveExperiment, type SavedExperiment } from '../../lib/experiments';
 import {
   Shuffle,
   TrendingUp,
@@ -14,6 +17,10 @@ import {
   Edit3,
   Activity,
   Sliders,
+  Bookmark,
+  BookmarkPlus,
+  PanelRightClose,
+  PanelRightOpen,
 } from 'lucide-react';
 
 function generateRandomArray(size: number, min = 5, max = 100): number[] {
@@ -43,6 +50,9 @@ export const SortingVisualizer: React.FC = () => {
   const [customInputStr, setCustomInputStr] = useState<string>('');
   const [customInputError, setCustomInputError] = useState<string | null>(null);
   const [showCustomModal, setShowCustomModal] = useState<boolean>(false);
+  const [showSavedModal, setShowSavedModal] = useState<boolean>(false);
+  const [showCodePanel, setShowCodePanel] = useState<boolean>(true);
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
 
   // Generate snapshots deterministically
   const snapshots = useMemo(() => {
@@ -52,6 +62,7 @@ export const SortingVisualizer: React.FC = () => {
   const playback = usePlayback({
     totalSteps: snapshots.length,
     initialSpeed: 160,
+    enableKeyboardShortcuts: true,
   });
 
   const { reset: resetPlayback } = playback;
@@ -108,11 +119,36 @@ export const SortingVisualizer: React.FC = () => {
     setShowCustomModal(false);
   };
 
+  const handleSaveCurrentExperiment = () => {
+    saveExperiment({
+      title: `${metadata.name} (N=${baseArray.length})`,
+      module: 'sorting',
+      algorithm: selectedAlgo,
+      config: {
+        array: [...baseArray],
+        size: baseArray.length,
+        speed: playback.speed,
+      },
+      notes: `Saved at step ${playback.currentIndex + 1} of ${snapshots.length}. Comparisons: ${currentSnapshot.comparisons}, Writes: ${currentSnapshot.swaps}.`,
+    });
+    setSaveSuccessMsg('Experiment saved to LocalStorage.');
+    setTimeout(() => setSaveSuccessMsg(null), 3000);
+  };
+
+  const handleLoadExperiment = (exp: SavedExperiment) => {
+    if (exp.module === 'sorting' && exp.config?.array) {
+      setSelectedAlgo(exp.algorithm as SortingAlgorithmKey);
+      setBaseArray(exp.config.array);
+      setArraySize(exp.config.array.length);
+      if (exp.config.speed) playback.setSpeed(exp.config.speed);
+    }
+  };
+
   const maxVal = useMemo(() => {
     return Math.max(...currentSnapshot.array.map((el) => el.value), 1);
   }, [currentSnapshot]);
 
-  // Color mapping for states (NO PURPLE)
+  // Color mapping for states
   const getBarColor = (state: string) => {
     switch (state) {
       case 'comparing':
@@ -215,13 +251,55 @@ export const SortingVisualizer: React.FC = () => {
             <Edit3 className="w-3.5 h-3.5 text-cyan-400" />
             <span>Custom CSV</span>
           </button>
+
+          {/* Experiments Persistence */}
+          <button
+            onClick={handleSaveCurrentExperiment}
+            className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-sm text-xs text-slate-300 transition-colors"
+            title="Save Current Setup to Local Storage"
+          >
+            <BookmarkPlus className="w-3.5 h-3.5 text-amber-400" />
+            <span>Save Profile</span>
+          </button>
+
+          <button
+            onClick={() => setShowSavedModal(true)}
+            className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-sm text-xs text-slate-300 transition-colors"
+            title="Open Saved Experiments"
+          >
+            <Bookmark className="w-3.5 h-3.5 text-sky-400" />
+            <span>Saved Profiles</span>
+          </button>
+
+          {/* Code Panel Toggle */}
+          <button
+            onClick={() => setShowCodePanel(!showCodePanel)}
+            className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-sm text-xs text-slate-300 transition-colors"
+            title="Toggle Pseudocode Panel"
+          >
+            {showCodePanel ? (
+              <PanelRightClose className="w-3.5 h-3.5 text-slate-400" />
+            ) : (
+              <PanelRightOpen className="w-3.5 h-3.5 text-slate-400" />
+            )}
+            <span>{showCodePanel ? 'Hide Code' : 'Show Code'}</span>
+          </button>
         </div>
       </div>
 
-      {/* Main Workspace Grid: Bars + Pseudocode */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Visualizer Canvas & Metrics (2 cols) */}
-        <div className="lg:col-span-2 flex flex-col gap-3">
+      {saveSuccessMsg && (
+        <div className="text-xs font-mono text-emerald-400 bg-emerald-950/60 p-2 rounded-sm border border-emerald-800 flex items-center justify-between">
+          <span>{saveSuccessMsg}</span>
+          <button onClick={() => setSaveSuccessMsg(null)} className="text-slate-400 hover:text-slate-200">
+            ×
+          </button>
+        </div>
+      )}
+
+      {/* Main Workspace Grid: Bars + Variable Inspector + Pseudocode */}
+      <div className={`grid grid-cols-1 ${showCodePanel ? 'lg:grid-cols-3' : 'lg:grid-cols-1'} gap-4`}>
+        {/* Visualizer Canvas & Metrics (2 cols if panel open, full width if closed) */}
+        <div className={`${showCodePanel ? 'lg:col-span-2' : ''} flex flex-col gap-3`}>
           {/* Real Metrics HUD */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
             <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-md">
@@ -312,6 +390,15 @@ export const SortingVisualizer: React.FC = () => {
             <span className="text-slate-200 font-mono">{currentSnapshot.description}</span>
           </div>
 
+          {/* Variable Inspector & Operational Reasoning */}
+          <VariableInspector
+            variables={currentSnapshot.variables}
+            changedKeys={currentSnapshot.changedKeys}
+            reasoning={currentSnapshot.reasoning}
+            stepIndex={playback.currentIndex}
+            totalSteps={snapshots.length}
+          />
+
           {/* Playback Controls */}
           <ControlBar
             isPlaying={playback.isPlaying}
@@ -324,19 +411,22 @@ export const SortingVisualizer: React.FC = () => {
             onReset={playback.reset}
             onSpeedChange={playback.setSpeed}
             onJumpTo={playback.jumpTo}
+            onJumpToEnd={playback.jumpToEnd}
           />
         </div>
 
         {/* Pseudocode & Specification Panel (1 col) */}
-        <div className="h-[520px]">
-          <PseudocodePanel
-            title={metadata.name}
-            lines={metadata.pseudocode}
-            activeLine={currentSnapshot.pseudocodeLine}
-            invariants={metadata.invariants}
-            description={metadata.description}
-          />
-        </div>
+        {showCodePanel && (
+          <div className="h-[620px]">
+            <PseudocodePanel
+              title={metadata.name}
+              lines={metadata.pseudocode}
+              activeLine={currentSnapshot.pseudocodeLine}
+              invariants={metadata.invariants}
+              description={metadata.description}
+            />
+          </div>
+        )}
       </div>
 
       {/* Custom Input Modal */}
@@ -386,6 +476,13 @@ export const SortingVisualizer: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Saved Experiments Modal */}
+      <SavedExperimentsModal
+        isOpen={showSavedModal}
+        onClose={() => setShowSavedModal(false)}
+        onLoadExperiment={handleLoadExperiment}
+      />
     </div>
   );
 };
