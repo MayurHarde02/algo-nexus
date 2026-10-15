@@ -1,9 +1,11 @@
 import type {
   CellType,
+  TerrainType,
   PathfindingAlgorithmKey,
   PathfindingMetadata,
   PathfindingSnapshot,
 } from '../../types/pathfinding';
+import { TERRAIN_COSTS } from '../../types/pathfinding';
 
 export const PATHFINDING_METADATA: Record<PathfindingAlgorithmKey, PathfindingMetadata> = {
   bfs: {
@@ -15,7 +17,7 @@ export const PATHFINDING_METADATA: Record<PathfindingAlgorithmKey, PathfindingMe
     weighted: false,
     heuristic: 'None (FIFO Queue)',
     description:
-      'Explores the grid uniformly in concentric frontier rings using a First-In First-Out (FIFO) queue. Guarantees the shortest path on unweighted graphs.',
+      'Explores the grid uniformly in concentric frontier rings using a First-In First-Out (FIFO) queue. Guarantees minimum hop count on unweighted grids, but ignores terrain weights.',
   },
   dfs: {
     key: 'dfs',
@@ -37,7 +39,7 @@ export const PATHFINDING_METADATA: Record<PathfindingAlgorithmKey, PathfindingMe
     weighted: true,
     heuristic: 'Cumulative Edge Weight',
     description:
-      'Greedy shortest-path algorithm using a priority queue. Always visits the unvisited node with the lowest cumulative distance from the start node.',
+      'Greedy shortest-path algorithm using a priority queue. Always expands the lowest cumulative cost g(n), intelligently detouring around high-cost mud and water.',
   },
   astar: {
     key: 'astar',
@@ -48,7 +50,7 @@ export const PATHFINDING_METADATA: Record<PathfindingAlgorithmKey, PathfindingMe
     weighted: true,
     heuristic: 'Manhattan Distance |x1 - x2| + |y1 - y2|',
     description:
-      'Informed search algorithm that combines cumulative cost g(n) with an admissible Manhattan heuristic h(n) to prioritize nodes pointing toward the target.',
+      'Informed search combining cumulative path cost g(n) with an admissible Manhattan heuristic h(n) to prioritize nodes directed toward the destination.',
   },
 };
 
@@ -61,7 +63,7 @@ export function createEmptyGrid(rows: number, cols: number): CellType[][] {
   return Array.from({ length: rows }, () => Array(cols).fill('empty'));
 }
 
-export function cloneGrid(grid: CellType[][]): CellType[][] {
+export function cloneGrid<T>(grid: T[][]): T[][] {
   return grid.map((r) => [...r]);
 }
 
@@ -95,7 +97,6 @@ export function generateRecursiveDivisionMaze(rows: number, cols: number): CellT
 
     const horizontal = r2 - r1 > c2 - c1;
     if (horizontal) {
-      // Choose wall row
       const wallR = Math.floor(Math.random() * (r2 - r1 - 1)) + r1 + 1;
       const passC = Math.floor(Math.random() * (c2 - c1 + 1)) + c1;
 
@@ -106,7 +107,6 @@ export function generateRecursiveDivisionMaze(rows: number, cols: number): CellT
       divide(r1, wallR - 1, c1, c2);
       divide(wallR + 1, r2, c1, c2);
     } else {
-      // Choose wall col
       const wallC = Math.floor(Math.random() * (c2 - c1 - 1)) + c1 + 1;
       const passR = Math.floor(Math.random() * (r2 - r1 + 1)) + r1;
 
@@ -123,6 +123,30 @@ export function generateRecursiveDivisionMaze(rows: number, cols: number): CellT
   return grid;
 }
 
+export function generateSwampCrossing(rows: number, cols: number): CellType[][] {
+  const grid = createEmptyGrid(rows, cols);
+  const midColStart = Math.floor(cols * 0.32);
+  const midColEnd = Math.floor(cols * 0.68);
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = midColStart; c <= midColEnd; c++) {
+      if (r >= 3) {
+        grid[r][c] = 'mud';
+        // Deep water pool in direct central axis
+        if (
+          r >= Math.floor(rows * 0.35) &&
+          r <= Math.floor(rows * 0.65) &&
+          c >= midColStart + 2 &&
+          c <= midColEnd - 2
+        ) {
+          grid[r][c] = 'water';
+        }
+      }
+    }
+  }
+  return grid;
+}
+
 const DIRS = [
   [-1, 0], // Up
   [1, 0],  // Down
@@ -134,11 +158,29 @@ export function runPathfinding(
   algo: PathfindingAlgorithmKey,
   baseGrid: CellType[][],
   start: Pos,
-  target: Pos
+  target: Pos,
+  customTerrain?: TerrainType[][]
 ): PathfindingSnapshot[] {
   const rows = baseGrid.length;
   const cols = baseGrid[0].length;
   const snapshots: PathfindingSnapshot[] = [];
+
+  // Derive terrain grid
+  const terrain: TerrainType[][] =
+    customTerrain ??
+    baseGrid.map((row) =>
+      row.map((c) => {
+        if (c === 'mud') return 'mud';
+        if (c === 'water') return 'water';
+        if (c === 'wall') return 'wall';
+        return 'empty';
+      })
+    );
+
+  const getCellCost = (r: number, c: number): number => {
+    const t = terrain[r][c];
+    return TERRAIN_COSTS[t] ?? 1;
+  };
 
   const currentGrid = cloneGrid(baseGrid);
   currentGrid[start.row][start.col] = 'start';
@@ -150,8 +192,10 @@ export function runPathfinding(
 
   snapshots.push({
     grid: cloneGrid(currentGrid),
+    terrain: cloneGrid(terrain),
     visitedCount: 0,
     pathLength: 0,
+    pathCost: 0,
     currentCell: start,
     statusText: `Initialized search from (${start.row}, ${start.col}) to (${target.row}, ${target.col}).`,
     isComplete: false,
@@ -182,7 +226,7 @@ export function runPathfinding(
         const nKey = `${nr},${nc}`;
 
         if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
-          if (baseGrid[nr][nc] !== 'wall' && !visited.has(nKey)) {
+          if (terrain[nr][nc] !== 'wall' && !visited.has(nKey)) {
             visited.add(nKey);
             parentMap.set(nKey, current);
             if (!(nr === target.row && nc === target.col)) {
@@ -195,8 +239,10 @@ export function runPathfinding(
 
       snapshots.push({
         grid: cloneGrid(currentGrid),
+        terrain: cloneGrid(terrain),
         visitedCount: visited.size,
         pathLength: 0,
+        pathCost: 0,
         currentCell: current,
         statusText: `Visiting (${current.row}, ${current.col}). Active frontier size: ${queue.length}.`,
         isComplete: false,
@@ -228,7 +274,7 @@ export function runPathfinding(
         const nKey = `${nr},${nc}`;
 
         if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
-          if (baseGrid[nr][nc] !== 'wall' && !visited.has(nKey)) {
+          if (terrain[nr][nc] !== 'wall' && !visited.has(nKey)) {
             if (!parentMap.has(nKey)) {
               parentMap.set(nKey, current);
             }
@@ -242,8 +288,10 @@ export function runPathfinding(
 
       snapshots.push({
         grid: cloneGrid(currentGrid),
+        terrain: cloneGrid(terrain),
         visitedCount: visited.size,
         pathLength: 0,
+        pathCost: 0,
         currentCell: current,
         statusText: `Exploring depth-first at (${current.row}, ${current.col}). Stack depth: ${stack.length}.`,
         isComplete: false,
@@ -280,8 +328,8 @@ export function runPathfinding(
         const nKey = `${nr},${nc}`;
 
         if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
-          if (baseGrid[nr][nc] !== 'wall' && !visited.has(nKey)) {
-            const edgeWeight = 1;
+          if (terrain[nr][nc] !== 'wall' && !visited.has(nKey)) {
+            const edgeWeight = getCellCost(nr, nc);
             const newDist = currentDist + edgeWeight;
             const oldDist = dist.get(nKey) ?? Infinity;
 
@@ -299,10 +347,12 @@ export function runPathfinding(
 
       snapshots.push({
         grid: cloneGrid(currentGrid),
+        terrain: cloneGrid(terrain),
         visitedCount: visited.size,
         pathLength: 0,
+        pathCost: 0,
         currentCell: current,
-        statusText: `Relaxing edges from (${current.row}, ${current.col}), distance: ${currentDist}.`,
+        statusText: `Relaxing edges from (${current.row}, ${current.col}), cumulative distance: ${currentDist}.`,
         isComplete: false,
         hasPath: false,
       });
@@ -339,8 +389,9 @@ export function runPathfinding(
         const nKey = `${nr},${nc}`;
 
         if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
-          if (baseGrid[nr][nc] !== 'wall') {
-            const tentativeG = currentG + 1;
+          if (terrain[nr][nc] !== 'wall') {
+            const edgeWeight = getCellCost(nr, nc);
+            const tentativeG = currentG + edgeWeight;
             if (tentativeG < (gScore.get(nKey) ?? Infinity)) {
               parentMap.set(nKey, current);
               gScore.set(nKey, tentativeG);
@@ -360,8 +411,10 @@ export function runPathfinding(
 
       snapshots.push({
         grid: cloneGrid(currentGrid),
+        terrain: cloneGrid(terrain),
         visitedCount: visited.size,
         pathLength: 0,
+        pathCost: 0,
         currentCell: current,
         statusText: `A* evaluation at (${current.row}, ${current.col}), g: ${currentG}, f: ${fScore.get(cKey)}.`,
         isComplete: false,
@@ -372,6 +425,7 @@ export function runPathfinding(
 
   // Reconstruct path if found
   let pathLen = 0;
+  let totalCost = 0;
   if (targetFound) {
     let curr: Pos | undefined = target;
     const pathNodes: Pos[] = [];
@@ -383,7 +437,11 @@ export function runPathfinding(
     pathNodes.reverse();
     pathLen = pathNodes.length - 1;
 
-    for (const p of pathNodes) {
+    for (let i = 0; i < pathNodes.length; i++) {
+      const p = pathNodes[i];
+      if (i > 0) {
+        totalCost += getCellCost(p.row, p.col);
+      }
       if (
         !(p.row === start.row && p.col === start.col) &&
         !(p.row === target.row && p.col === target.col)
@@ -394,18 +452,22 @@ export function runPathfinding(
 
     snapshots.push({
       grid: cloneGrid(currentGrid),
+      terrain: cloneGrid(terrain),
       visitedCount: visited.size,
       pathLength: pathLen,
+      pathCost: totalCost,
       currentCell: target,
-      statusText: `Destination reached. Shortest route length: ${pathLen} units across ${visited.size} explored nodes.`,
+      statusText: `Destination reached. Route length: ${pathLen} hops, total cost: ${totalCost} across ${visited.size} explored nodes.`,
       isComplete: true,
       hasPath: true,
     });
   } else {
     snapshots.push({
       grid: cloneGrid(currentGrid),
+      terrain: cloneGrid(terrain),
       visitedCount: visited.size,
       pathLength: 0,
+      pathCost: 0,
       currentCell: null,
       statusText: `Target unreachable: no open graph route exists between start and destination.`,
       isComplete: true,

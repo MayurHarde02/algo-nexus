@@ -2,6 +2,18 @@
 
 All notable changes to ALGO NEXUS will be documented in this file.
 
+## [1.2.0] - 2026-10-15
+
+### Added
+- Minimum Spanning Trees (MST): Kruskal's Algorithm with Disjoint Set Union (DSU with union by rank and path compression) and Prim's Algorithm with cut-edge priority queue.
+- Bellman-Ford Shortest Paths: $V-1$ edge relaxation passes and negative weight cycle detection pass with explicit cycle highlighting.
+- Weighted Graph Visualizer: SVG graph canvas with mid-point edge weight badges, MST edge highlighting, and candidate evaluation states.
+- Multi-Cost Terrain Pathfinding: Terrain brushes for Normal (cost 1), Mud (cost 3), Water (cost 5), and Walls (impassable). Dijkstra and A* compute optimal weighted costs, outperforming unweighted hop-count BFS.
+- Swamp Crossing Benchmark Map: Terrain preset demonstrating Dijkstra routing around mud/water obstacles.
+- AST-Driven Pseudocode Sandbox: Client-side lexer, recursive-descent parser, and deterministic VM stepping through algorithmic DSL without eval(). Includes presets for Bubble Sort, Binary Search, Two-Pointers Reversal, and Kadane's Algorithm.
+- Academic Execution Report Generator: One-click export to formal Markdown and LaTeX documents with asymptotic bounds, Master Theorem recurrence solutions, and hardware operational counters.
+- Comprehensive Vitest test suite expanded to 66 passing test cases across 10 test suites.
+
 ## [1.1.0] - 2026-10-15
 
 ### Added

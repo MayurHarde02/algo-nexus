@@ -9,7 +9,9 @@ import { DynamicProgrammingWorkbench } from './modules/dp/DynamicProgrammingWork
 import { PathfindingVisualizer } from './modules/pathfinding/PathfindingVisualizer';
 import { SchedulingVisualizer } from './modules/scheduling/SchedulingVisualizer';
 import { GraphVisualizer } from './modules/graph/GraphVisualizer';
+import { PseudocodeSandbox } from './modules/sandbox/PseudocodeSandbox';
 import { ComplexityReference } from './modules/reference/ComplexityReference';
+import { ExportReportModal } from './components/experiments/ExportReportModal';
 import { Terminal, Share2, Check } from 'lucide-react';
 
 export function App() {
@@ -26,6 +28,7 @@ export function App() {
         'pathfinding',
         'scheduling',
         'graph',
+        'sandbox',
         'reference',
       ];
       if (param && validTabs.includes(param as ActiveTab)) {
@@ -36,6 +39,7 @@ export function App() {
   });
 
   const [copiedUrl, setCopiedUrl] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   const handleTabChange = (tab: ActiveTab) => {
     setActiveTab(tab);
@@ -54,7 +58,11 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-sky-500/30 selection:text-sky-200">
-      <Navbar activeTab={activeTab} onTabChange={handleTabChange} />
+      <Navbar
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        onOpenReport={() => setIsReportModalOpen(true)}
+      />
 
       {/* Main Workspace Viewport */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col gap-5">
@@ -71,19 +79,21 @@ export function App() {
               {activeTab === 'dp' && 'Dynamic Programming Workbench'}
               {activeTab === 'pathfinding' && 'Pathfinding Lab'}
               {activeTab === 'scheduling' && 'CPU Scheduler'}
-              {activeTab === 'graph' && 'Graph Explorer'}
+              {activeTab === 'graph' && 'Graph & Network Explorer'}
+              {activeTab === 'sandbox' && 'Pseudocode Sandbox (AST VM)'}
               {activeTab === 'reference' && 'Complexity Matrix'}
             </h1>
             <p className="text-xs text-slate-400 font-mono mt-0.5">
-              {activeTab === 'sorting' && 'Deterministic step execution, register variables, and L1 cache locality simulation.'}
+              {activeTab === 'sorting' && 'Deterministic step execution, register variables, and L1 hardware cache locality simulation.'}
               {activeTab === 'race' && 'Synchronous side-by-side execution on identical array seeds to evaluate operation divergence.'}
               {activeTab === 'benchmark' && 'Multi-size empirical scaling curves across random, sorted, and reverse-sorted patterns.'}
-              {activeTab === 'datastructures' && 'Interactive visual manipulation of Stack (LIFO), Queue (FIFO), BST, AVL Trees, and Min-Heaps.'}
+              {activeTab === 'datastructures' && 'Interactive visual manipulation of Stack, Queue, BST, AVL Trees, and Binary Min-Heap.'}
               {activeTab === 'challenge' && 'Active learning comprehension challenges with step predictions and immediate verification.'}
               {activeTab === 'dp' && '2D memoization tableaux for 0/1 Knapsack and Longest Common Subsequence with backtracking.'}
-              {activeTab === 'pathfinding' && 'Interactive maze generation and grid path traversal via FIFO, LIFO, and greedy heuristics.'}
+              {activeTab === 'pathfinding' && 'Multi-cost terrain traversal (mud=3, water=5, wall=inf) comparing Dijkstra, A*, and BFS.'}
               {activeTab === 'scheduling' && 'Mathematical verification of CT, TAT = CT - AT, and WT = TAT - BT on interactive Gantt timeline.'}
-              {activeTab === 'graph' && 'Adjacency list exploration with live inspection of FIFO queue and LIFO stack memory.'}
+              {activeTab === 'graph' && "Kruskal's MST with DSU, Prim's cut-edge selection, and Bellman-Ford negative cycle detection."}
+              {activeTab === 'sandbox' && 'Client-side lexer, recursive-descent parser, and deterministic VM stepping through algorithmic DSL.'}
               {activeTab === 'reference' && 'Comprehensive theoretical bounds matrix across sorting, graph, and operating system algorithms.'}
             </p>
           </div>
@@ -118,9 +128,17 @@ export function App() {
           {activeTab === 'pathfinding' && <PathfindingVisualizer />}
           {activeTab === 'scheduling' && <SchedulingVisualizer />}
           {activeTab === 'graph' && <GraphVisualizer />}
+          {activeTab === 'sandbox' && <PseudocodeSandbox />}
           {activeTab === 'reference' && <ComplexityReference />}
         </div>
       </main>
+
+      {/* Export Report Modal */}
+      <ExportReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        activeModule={activeTab}
+      />
 
       {/* Academic Engineering Footer */}
       <footer className="border-t border-slate-800 bg-slate-950 py-4 text-xs font-mono text-slate-500">
@@ -135,6 +153,8 @@ export function App() {
             <span>Deterministic Event Model</span>
             <span>•</span>
             <span>Hardware Cache Locality</span>
+            <span>•</span>
+            <span>AST Interpreter VM</span>
             <span>•</span>
             <span>LocalStorage Persistence</span>
           </div>

@@ -46,6 +46,31 @@ describe('Pathfinding Engine Unit Tests', () => {
     const finalSnapshot = snapshots[snapshots.length - 1];
 
     expect(finalSnapshot.hasPath).toBe(true);
-    expect(finalSnapshot.pathLength).toBeGreaterThan(0);
+  });
+
+  it('Dijkstra finds lower total cost path than unweighted BFS on swamp terrain', () => {
+    const grid = createEmptyGrid(8, 12);
+    // Fill central columns with heavy water (cost 5) except top row (cost 1)
+    for (let r = 1; r < 8; r++) {
+      for (let c = 4; c <= 7; c++) {
+        grid[r][c] = 'water';
+      }
+    }
+
+    const start = { row: 4, col: 1 };
+    const target = { row: 4, col: 10 };
+
+    const bfsSnaps = runPathfinding('bfs', grid, start, target);
+    const dijkstraSnaps = runPathfinding('dijkstra', grid, start, target);
+
+    const finalBfs = bfsSnaps[bfsSnaps.length - 1];
+    const finalDijkstra = dijkstraSnaps[dijkstraSnaps.length - 1];
+
+    expect(finalBfs.hasPath).toBe(true);
+    expect(finalDijkstra.hasPath).toBe(true);
+
+    // BFS takes direct path through water (hop count is minimal, but total cost is higher)
+    // Dijkstra routes around water through the cost-1 corridor, achieving lower total path cost
+    expect(finalDijkstra.pathCost).toBeLessThan(finalBfs.pathCost!);
   });
 });

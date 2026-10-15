@@ -11,6 +11,8 @@ import {
   BookOpen,
   Binary,
   Table,
+  Code2,
+  FileText,
 } from 'lucide-react';
 
 export type ActiveTab =
@@ -23,14 +25,16 @@ export type ActiveTab =
   | 'pathfinding'
   | 'scheduling'
   | 'graph'
+  | 'sandbox'
   | 'reference';
 
 interface NavbarProps {
   activeTab: ActiveTab;
   onTabChange: (tab: ActiveTab) => void;
+  onOpenReport?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange }) => {
+export const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, onOpenReport }) => {
   const navItems: { id: ActiveTab; label: string; icon: React.FC<{ className?: string }> }[] = [
     { id: 'sorting', label: 'Sorting', icon: Layers },
     { id: 'race', label: 'Race', icon: Split },
@@ -41,6 +45,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange }) => {
     { id: 'pathfinding', label: 'Pathfinding', icon: Compass },
     { id: 'scheduling', label: 'Scheduler', icon: Cpu },
     { id: 'graph', label: 'Graph', icon: Network },
+    { id: 'sandbox', label: 'Pseudocode VM', icon: Code2 },
     { id: 'reference', label: 'Reference', icon: BookOpen },
   ];
 
@@ -57,8 +62,8 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange }) => {
               <span className="font-mono font-bold text-slate-100 text-sm tracking-widest">
                 ALGO NEXUS
               </span>
-              <span className="text-[10px] font-mono text-slate-500 bg-slate-900 px-1.5 py-0.5 rounded-xs border border-slate-800">
-                v1.0
+              <span className="text-[10px] font-mono text-sky-400 bg-sky-950/60 px-1.5 py-0.5 rounded-xs border border-sky-800 font-semibold">
+                v1.2
               </span>
             </div>
             <span className="text-[10px] text-slate-400 block font-mono">
@@ -90,10 +95,23 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange }) => {
           })}
         </nav>
 
-        {/* Engine Status indicator */}
-        <div className="hidden xl:flex items-center gap-2 font-mono text-[11px] text-slate-400 bg-slate-900/80 px-2.5 py-1 rounded-sm border border-slate-800">
-          <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-          <span>DETERMINISTIC V8 ENGINE</span>
+        {/* Academic Report Action & Engine Status */}
+        <div className="flex items-center gap-2 font-mono text-[11px] text-slate-400">
+          {onOpenReport && (
+            <button
+              onClick={onOpenReport}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-sm font-mono text-xs text-sky-300 hover:text-white bg-sky-950/50 hover:bg-sky-900/60 border border-sky-800 transition-colors"
+              title="Generate formal academic execution report in Markdown or LaTeX"
+            >
+              <FileText className="w-3.5 h-3.5 text-sky-400" />
+              <span className="hidden sm:inline">Academic Report</span>
+            </button>
+          )}
+
+          <div className="hidden xl:flex items-center gap-2 bg-slate-900/80 px-2.5 py-1 rounded-sm border border-slate-800">
+            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span>DETERMINISTIC V8</span>
+          </div>
         </div>
       </div>
     </header>
